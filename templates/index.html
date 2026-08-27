@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        AI Image Recognition System
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+
+    <!-- HEADER -->
+
+    <div class="header">
+
+        <h1>
+            AI Image Recognition System
+        </h1>
+
+        <p>
+            Upload an image and let AI analyze
+            its visual content.
+        </p>
+
+    </div>
+
+
+
+    <!-- MAIN CARD -->
+
+    <div class="card">
+
+
+        <!-- UPLOAD -->
+
+        <form id="uploadForm">
+
+
+            <label
+                class="upload-box"
+                for="imageInput"
+            >
+
+                <span>
+                    📷 Choose an image
+                </span>
+
+                <small>
+                    JPG, JPEG, PNG or WEBP
+                    · Maximum 10 MB
+                </small>
+
+            </label>
+
+
+            <input
+                id="imageInput"
+                name="image"
+                type="file"
+                accept="
+                    .jpg,
+                    .jpeg,
+                    .png,
+                    .webp,
+                    image/*
+                "
+                required
+            >
+
+
+
+            <!-- IMAGE PREVIEW -->
+
+            <div
+                id="previewContainer"
+                class="preview-container hidden"
+            >
+
+                <img
+                    id="preview"
+                    alt="Selected image"
+                >
+
+            </div>
+
+
+
+            <!-- BUTTON -->
+
+            <button
+                id="predictButton"
+                type="submit"
+            >
+
+                Analyze Image
+
+            </button>
+
+
+        </form>
+
+
+
+        <!-- LOADING -->
+
+        <div
+            id="loading"
+            class="loading hidden"
+        >
+
+            🤖 AI is analyzing your image...
+
+        </div>
+
+
+
+        <!-- ERROR -->
+
+        <div
+            id="error"
+            class="error hidden"
+        ></div>
+
+
+
+        <!-- RESULT -->
+
+        <div
+            id="result"
+            class="result hidden"
+        >
+
+
+            <h2 id="prediction">
+            </h2>
+
+
+            <div class="confidence">
+
+                <span>
+                    AI Confidence
+                </span>
+
+                <strong
+                    id="confidenceValue"
+                >
+                </strong>
+
+            </div>
+
+
+            <div class="progress">
+
+                <div
+                    id="confidenceBar"
+                ></div>
+
+            </div>
+
+
+
+            <h3>
+                Top AI Matches
+            </h3>
+
+
+            <div
+                id="topPredictions"
+            ></div>
+
+
+        </div>
+
+
+    </div>
+
+
+</div>
+
+
+
+<script>
+
+
+const form =
+    document.getElementById(
+        "uploadForm"
+    );
+
+
+const input =
+    document.getElementById(
+        "imageInput"
+    );
+
+
+const preview =
+    document.getElementById(
+        "preview"
+    );
+
+
+const previewContainer =
+    document.getElementById(
+        "previewContainer"
+    );
+
+
+const loading =
+    document.getElementById(
+        "loading"
+    );
+
+
+const errorBox =
+    document.getElementById(
+        "error"
+    );
+
+
+const result =
+    document.getElementById(
+        "result"
+    );
+
+
+const prediction =
+    document.getElementById(
+        "prediction"
+    );
+
+
+const confidenceValue =
+    document.getElementById(
+        "confidenceValue"
+    );
+
+
+const confidenceBar =
+    document.getElementById(
+        "confidenceBar"
+    );
+
+
+const topPredictions =
+    document.getElementById(
+        "topPredictions"
+    );
+
+
+const predictButton =
+    document.getElementById(
+        "predictButton"
+    );
+
+
+
+/* ---------------------------------------
+   Image preview
+--------------------------------------- */
+
+input.addEventListener(
+    "change",
+    () => {
+
+        const file =
+            input.files[0];
+
+
+        if (!file) {
+
+            previewContainer
+                .classList
+                .add("hidden");
+
+            return;
+        }
+
+
+        preview.src =
+            URL.createObjectURL(
+                file
+            );
+
+
+        previewContainer
+            .classList
+            .remove("hidden");
+
+
+        result
+            .classList
+            .add("hidden");
+
+
+        errorBox
+            .classList
+            .add("hidden");
+    }
+);
+
+
+
+/* ---------------------------------------
+   Prediction
+--------------------------------------- */
+
+form.addEventListener(
+    "submit",
+    async (event) => {
+
+        event.preventDefault();
+
+
+        const file =
+            input.files[0];
+
+
+        if (!file) {
+
+            return;
+        }
+
+
+        const formData =
+            new FormData();
+
+
+        formData.append(
+            "image",
+            file
+        );
+
+
+        loading
+            .classList
+            .remove("hidden");
+
+
+        errorBox
+            .classList
+            .add("hidden");
+
+
+        result
+            .classList
+            .add("hidden");
+
+
+        predictButton.disabled =
+            true;
+
+
+        try {
+
+            const response =
+                await fetch(
+                    "/predict",
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data.error ||
+                    "Prediction failed."
+                );
+
+            }
+
+
+            /* --------------------------------
+               Main prediction
+            -------------------------------- */
+
+            prediction.textContent =
+                data.prediction;
+
+
+            confidenceValue.textContent =
+                data.confidence +
+                "%";
+
+
+            confidenceBar.style.width =
+                data.confidence +
+                "%";
+
+
+
+            /* --------------------------------
+               Top predictions
+            -------------------------------- */
+
+            topPredictions.innerHTML =
+                "";
+
+
+            data.top_predictions
+                .forEach(
+                    (item, index) => {
+
+                        const row =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        row.className =
+                            "prediction-row";
+
+
+                        const label =
+                            document.createElement(
+                                "span"
+                            );
+
+
+                        label.textContent =
+                            `${index + 1}. ${item.label}`;
+
+
+                        const score =
+                            document.createElement(
+                                "strong"
+                            );
+
+
+                        score.textContent =
+                            item.confidence +
+                            "%";
+
+
+                        row.appendChild(
+                            label
+                        );
+
+
+                        row.appendChild(
+                            score
+                        );
+
+
+                        topPredictions
+                            .appendChild(
+                                row
+                            );
+
+                    }
+                );
+
+
+            result
+                .classList
+                .remove("hidden");
+
+
+        } catch (error) {
+
+            errorBox.textContent =
+                error.message;
+
+
+            errorBox
+                .classList
+                .remove("hidden");
+
+
+        } finally {
+
+            loading
+                .classList
+                .add("hidden");
+
+
+            predictButton.disabled =
+                false;
+
+        }
+
+    }
+);
+
+
+</script>
+
+
+</body>
+
+</html>
